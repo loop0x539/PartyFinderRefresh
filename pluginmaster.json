@@ -1,0 +1,20 @@
+[
+  {
+    "Author": "loop0x539",
+    "Name": "Party Finder Refresh",
+    "InternalName": "PartyFinderRefresh",
+    "AssemblyVersion": "0.1.0.0",
+    "Punchline": "Save Party Finder presets, deploy them in one click, and auto-renew before the listing expires.",
+    "Description": "Create reusable Party Finder recruitment presets by capturing your current setup, deploy any preset with a single click, and keep the listing alive by automatically re-recruiting before the 60-minute timer expires. Optional periodic refresh keeps your listing near the top of the search.",
+    "RepoUrl": "https://github.com/loop0x539/PartyFinderRefresh",
+    "ApplicableVersion": "any",
+    "Tags": ["partyfinder", "recruitment", "pf", "preset", "refresh"],
+    "CategoryTags": ["utility"],
+    "DalamudApiLevel": 15,
+    "DownloadLinkInstall": "https://github.com/loop0x539/PartyFinderRefresh/releases/latest/download/latest.zip",
+    "DownloadLinkTesting": "https://github.com/loop0x539/PartyFinderRefresh/releases/latest/download/latest.zip",
+    "DownloadLinkUpdate": "https://github.com/loop0x539/PartyFinderRefresh/releases/latest/download/latest.zip",
+    "DownloadCount": 0,
+    "LastUpdate": 1749513600
+  }
+]

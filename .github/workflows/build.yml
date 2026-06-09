@@ -1,0 +1,57 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.x'
+
+      - name: Download Dalamud
+        run: |
+          wget https://goatcorp.github.io/dalamud-distrib/stg/latest.zip -O /tmp/dalamud.zip
+          mkdir -p /home/runner/.xlcore/dalamud/Hooks/dev
+          unzip /tmp/dalamud.zip -d /home/runner/.xlcore/dalamud/Hooks/dev
+
+      - name: Build
+        run: dotnet build -c Release -v minimal
+
+      - name: Publish release
+        run: |
+          gh release delete latest --cleanup-tag --yes || true
+          gh release create latest bin/Release/PartyFinderRefresh/latest.zip \
+            --title "Latest Build" \
+            --notes "Built from ${{ github.sha }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update pluginmaster.json
+        run: |
+          VERSION=$(grep -oP '(?<=<Version>)[^<]+' PartyFinderRefresh.csproj)
+          TIMESTAMP=$(date +%s)
+          jq --arg v "$VERSION" --argjson t "$TIMESTAMP" \
+            '.[0].AssemblyVersion = $v | .[0].LastUpdate = $t' \
+            pluginmaster.json > tmp.json && mv tmp.json pluginmaster.json
+
+      - name: Commit pluginmaster.json
+        run: |
+          VERSION=$(grep -oP '(?<=<Version>)[^<]+' PartyFinderRefresh.csproj)
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add pluginmaster.json
+          git diff --staged --quiet || \
+            git commit -m "Update pluginmaster.json to ${VERSION} [skip ci]"
+          git push

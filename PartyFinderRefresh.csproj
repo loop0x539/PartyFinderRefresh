@@ -1,0 +1,22 @@
+<Project Sdk="Dalamud.NET.Sdk/15.0.0">
+
+  <PropertyGroup>
+    <Version>0.1.0.0</Version>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <!-- Plugin manifest. With Dalamud.NET.Sdk these live in the csproj; InternalName
+       and DalamudApiLevel are filled in automatically by DalamudPackager. -->
+  <PropertyGroup>
+    <Name>Party Finder Refresh</Name>
+    <Author>loop0x539</Author>
+    <Punchline>Save Party Finder presets, deploy them in one click, and auto-renew before the listing expires.</Punchline>
+    <Description>Create reusable Party Finder recruitment presets by capturing your current setup, deploy any preset with a single click, and keep the listing alive by automatically re-recruiting before the 60-minute timer expires. Optional periodic refresh keeps your listing near the top of the search.</Description>
+    <Tags>partyfinder;recruitment;pf;preset;refresh</Tags>
+    <CategoryTags>utility</CategoryTags>
+  </PropertyGroup>
+
+</Project>
