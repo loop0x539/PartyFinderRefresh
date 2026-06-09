@@ -8,13 +8,21 @@
     "Description": "Create reusable Party Finder recruitment presets by capturing your current setup, deploy any preset with a single click, and keep the listing alive by automatically re-recruiting before the 60-minute timer expires. Optional periodic refresh keeps your listing near the top of the search.",
     "RepoUrl": "https://github.com/loop0x539/PartyFinderRefresh",
     "ApplicableVersion": "any",
-    "Tags": ["partyfinder", "recruitment", "pf", "preset", "refresh"],
-    "CategoryTags": ["utility"],
+    "Tags": [
+      "partyfinder",
+      "recruitment",
+      "pf",
+      "preset",
+      "refresh"
+    ],
+    "CategoryTags": [
+      "utility"
+    ],
     "DalamudApiLevel": 15,
     "DownloadLinkInstall": "https://github.com/loop0x539/PartyFinderRefresh/releases/latest/download/latest.zip",
     "DownloadLinkTesting": "https://github.com/loop0x539/PartyFinderRefresh/releases/latest/download/latest.zip",
     "DownloadLinkUpdate": "https://github.com/loop0x539/PartyFinderRefresh/releases/latest/download/latest.zip",
     "DownloadCount": 0,
-    "LastUpdate": 1749513600
+    "LastUpdate": 1781043849
   }
 ]
