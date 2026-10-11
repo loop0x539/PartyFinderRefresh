@@ -14,6 +14,7 @@ public sealed class Plugin : IDalamudPlugin
 
     private readonly IDalamudPluginInterface pluginInterface;
     private readonly ICommandManager commandManager;
+    private readonly IChatGui chat;
     private readonly Configuration config;
 
     private readonly WindowSystem windowSystem = new("PartyFinderRefresh");
@@ -38,21 +39,23 @@ public sealed class Plugin : IDalamudPlugin
     {
         this.pluginInterface = pluginInterface;
         this.commandManager = commandManager;
+        this.chat = chat;
 
         config = pluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
         config.Initialize(pluginInterface);
 
         partyFinder = new PartyFinderManager(sigScanner, framework, log, gameGui, playerState, dataManager);
-        scheduler = new RefreshScheduler(framework, clientState, partyList, log, config, partyFinder);
+        scheduler = new RefreshScheduler(framework, clientState, partyList, chat, log, config, partyFinder);
 
         configWindow = new ConfigWindow(config);
-        mainWindow = new MainWindow(config, partyFinder, scheduler, chat, () => configWindow.IsOpen = true);
+        mainWindow = new MainWindow(config, partyFinder, scheduler, new DutyNames(dataManager, log),
+                                    new JobMasks(dataManager, log), chat, () => configWindow.IsOpen = true);
         windowSystem.AddWindow(mainWindow);
         windowSystem.AddWindow(configWindow);
 
         commandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
         {
-            HelpMessage = "Open Party Finder Refresh. Use \"/pfr config\" for settings.",
+            HelpMessage = "Open Party Finder Refresh. \"/pfr config\" opens settings, \"/pfr stop\" stops keeping the listing alive.",
         });
 
         pluginInterface.UiBuilder.Draw += windowSystem.Draw;
@@ -65,10 +68,26 @@ public sealed class Plugin : IDalamudPlugin
 
     private void OnCommand(string command, string args)
     {
-        if (args.Trim().Equals("config", StringComparison.OrdinalIgnoreCase))
-            ToggleConfig();
-        else
-            ToggleMain();
+        switch (args.Trim().ToLowerInvariant())
+        {
+            case "config":
+                ToggleConfig();
+                break;
+            case "stop":
+                if (scheduler.IsActive)
+                {
+                    scheduler.Stop();
+                    chat.Print("[PFR] Stopped keeping the listing alive. The in-game listing stays up until it expires or you end it.");
+                }
+                else
+                {
+                    chat.Print("[PFR] Nothing is being kept alive.");
+                }
+                break;
+            default:
+                ToggleMain();
+                break;
+        }
     }
 
     private void ToggleMain() => mainWindow.Toggle();

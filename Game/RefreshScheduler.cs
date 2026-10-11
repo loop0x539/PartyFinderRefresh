@@ -21,10 +21,15 @@ public sealed class RefreshScheduler : IDisposable
     // Minimum gap between automatic re-posts. Rapid re-posts desync the cross-world party
     // ("unable to retrieve party member information"), so never auto-deploy more often than this.
     private const double RepostDebounceSeconds = 30.0;
+    // The party must read full for this long before we stop, so a one-tick count glitch can't end it.
+    private const double FullConfirmSeconds = 2.0;
+    // Slots per party when a preset doesn't say (every normal PF party is 8, light parties are 4).
+    private const int DefaultPartySlots = 8;
 
     private readonly IFramework framework;
     private readonly IClientState clientState;
     private readonly IPartyList partyList;
+    private readonly IChatGui chat;
     private readonly IPluginLog log;
     private readonly Configuration config;
     private readonly PartyFinderManager pfm;
@@ -33,6 +38,7 @@ public sealed class RefreshScheduler : IDisposable
     private DateTime lastTickUtc = DateTime.MinValue;
     private DateTime lastRepostUtc = DateTime.MinValue; // last automatic re-post (debounce floor)
     private DateTime? notRecruitingSinceUtc; // when recruiting first read "off" (null = currently on)
+    private DateTime? fullSinceUtc; // when the party first read full (null = not full)
     private int lastPartyCount = -1; // -1 = unknown (not currently tracking)
 
     // Change-logged diagnostics so a real test can be confirmed from /xllog.
@@ -46,12 +52,37 @@ public sealed class RefreshScheduler : IDisposable
 
     public bool IsActive => config.ActivePresetId != null;
 
-    public RefreshScheduler(IFramework framework, IClientState clientState, IPartyList partyList,
+    /// <summary>Why the scheduler last stopped on its own (null after a manual stop or a new deploy).</summary>
+    public string? LastAutoStopReason { get; private set; }
+
+    /// <summary>Name of the preset that was active when <see cref="LastAutoStopReason"/> was set.</summary>
+    public string? LastAutoStopPreset { get; private set; }
+
+    public DateTime LastAutoStopUtc { get; private set; }
+
+    /// <summary>True for the first few seconds after a (re)deploy, before the listing is expected to show as up.</summary>
+    public bool InStartupGrace => (DateTime.UtcNow - lastActionUtc).TotalSeconds < StartupGraceSeconds;
+
+    /// <summary>Length of the current renew/bump cycle, for the UI countdown bar.</summary>
+    public double ActionIntervalSeconds => EffectiveIntervalSeconds();
+
+    /// <summary>True when the next scheduled action is a bump rather than the safety renew.</summary>
+    public bool NextActionIsBump => config.EnableBumpRefresh && BumpSeconds() < RenewSeconds();
+
+    /// <summary>Party size from every available source, so it's right in same-world, cross-world and in-instance parties.</summary>
+    public int PartyCount => Math.Max(partyList.Length, Math.Max(pfm.CrossRealmPartyCount, pfm.LocalPartyCount));
+
+    /// <summary>How many members fill one party of this preset's listing.</summary>
+    public static int PartySlots(RecruitmentPreset preset) =>
+        preset.NumberOfSlotsInMainParty is > 0 and <= 8 ? preset.NumberOfSlotsInMainParty : DefaultPartySlots;
+
+    public RefreshScheduler(IFramework framework, IClientState clientState, IPartyList partyList, IChatGui chat,
                             IPluginLog log, Configuration config, PartyFinderManager pfm)
     {
         this.framework = framework;
         this.clientState = clientState;
         this.partyList = partyList;
+        this.chat = chat;
         this.log = log;
         this.config = config;
         this.pfm = pfm;
@@ -64,12 +95,31 @@ public sealed class RefreshScheduler : IDisposable
         config.ActivePresetId = preset.Id;
         lastActionUtc = DateTime.UtcNow;
         lastRepostUtc = DateTime.UtcNow; // a manual deploy starts the debounce window
+        fullSinceUtc = null;
+        LastAutoStopReason = null;
         config.Save();
     }
 
     /// <summary>Stop keeping any preset alive (does not end the in-game listing).</summary>
     public void Stop()
     {
+        LastAutoStopReason = null;
+        Deactivate();
+    }
+
+    /// <summary>Stop on our own, remembering why so the UI and chat can explain it.</summary>
+    private void AutoStop(RecruitmentPreset preset, string reason)
+    {
+        LastAutoStopReason = reason;
+        LastAutoStopPreset = preset.Name;
+        LastAutoStopUtc = DateTime.UtcNow;
+        chat.Print($"[PFR] Stopped keeping '{preset.Name}' alive: {reason}.");
+        Deactivate();
+    }
+
+    private void Deactivate()
+    {
+        fullSinceUtc = null;
         if (config.ActivePresetId == null)
             return;
         config.ActivePresetId = null;
@@ -85,12 +135,30 @@ public sealed class RefreshScheduler : IDisposable
         return Math.Max(0, EffectiveIntervalSeconds() - elapsed);
     }
 
-    private double EffectiveIntervalSeconds()
+    private double RenewSeconds() => Math.Max(60, config.RenewIntervalMinutes * 60.0);
+
+    private double BumpSeconds() => Math.Max(MinBumpSeconds, config.BumpIntervalSeconds);
+
+    private double EffectiveIntervalSeconds() =>
+        config.EnableBumpRefresh ? Math.Min(RenewSeconds(), BumpSeconds()) : RenewSeconds();
+
+    /// <summary>
+    /// True once the party has read full for long enough to trust it. Alliance listings span several
+    /// parties, so ours can be full while the others still have open slots — for those we also wait for
+    /// the game to end recruitment, with the same long confirm window used for "listing ended".
+    /// </summary>
+    private bool IsPartyFull(RecruitmentPreset preset, int partyCount, bool recruiting, DateTime now)
     {
-        var renewSec = Math.Max(60, config.RenewIntervalMinutes * 60.0);
-        if (config.EnableBumpRefresh)
-            renewSec = Math.Min(renewSec, Math.Max(MinBumpSeconds, config.BumpIntervalSeconds));
-        return renewSec;
+        var alliance = preset.NumberOfGroups > 1;
+        if (partyCount < PartySlots(preset) || (alliance && recruiting))
+        {
+            fullSinceUtc = null;
+            return false;
+        }
+
+        fullSinceUtc ??= now;
+        var confirm = alliance ? EndedConfirmSeconds : FullConfirmSeconds;
+        return (now - fullSinceUtc.Value).TotalSeconds >= confirm;
     }
 
     private void OnUpdate(IFramework fw)
@@ -119,7 +187,7 @@ public sealed class RefreshScheduler : IDisposable
 
         // Party size from every available source so a leaver is detectable in any party type (same-world,
         // cross-world, or in-instance) and regardless of recruiting state.
-        var partyCount = Math.Max(partyList.Length, Math.Max(pfm.CrossRealmPartyCount, pfm.LocalPartyCount));
+        var partyCount = PartyCount;
 
         if (recruiting != loggedRecruiting || partyCount != loggedPartyCount)
         {
@@ -129,13 +197,23 @@ public sealed class RefreshScheduler : IDisposable
             loggedPartyCount = partyCount;
         }
 
+        // --- SECTION 0: PARTY FULL ---
+        // A full party can't take anyone else, so there's nothing left to keep alive. Checked before the
+        // timers so a renew can never re-open the listing once everyone has joined.
+        if (config.StopWhenFull && IsPartyFull(preset, partyCount, recruiting, now))
+        {
+            log.Information("[PFR] Party is full ({Count}/{Slots}); stopping auto-renew for '{Name}'.",
+                partyCount, PartySlots(preset), preset.Name);
+            AutoStop(preset, "the party is full");
+            return;
+        }
+
         // --- SECTION 1: TIMER CHECKS ---
         // Evaluate countdown timers first so background tasks fire regardless of closed UI visibility states.
         // Only renew/bump a listing that is actually live: renewing nothing makes no sense, and while we stay
         // armed in a full party (Section 2) an ungated renew would spuriously re-open a listing mid-duty.
-        var renewSec = Math.Max(60, config.RenewIntervalMinutes * 60.0);
-        var mustRenew = elapsed >= renewSec;
-        var bumpDue = config.EnableBumpRefresh && elapsed >= Math.Max(MinBumpSeconds, config.BumpIntervalSeconds);
+        var mustRenew = elapsed >= RenewSeconds();
+        var bumpDue = config.EnableBumpRefresh && elapsed >= BumpSeconds();
 
         if (recruiting && (mustRenew || bumpDue))
         {
@@ -202,7 +280,7 @@ public sealed class RefreshScheduler : IDisposable
                 (now - notRecruitingSinceUtc.Value).TotalSeconds > EndedConfirmSeconds)
             {
                 log.Information("[PFR] Listing down and not in a party; stopping auto-renew for '{Name}'.", preset.Name);
-                Stop();
+                AutoStop(preset, "the listing ended and you're not in a party");
             }
 
             return;

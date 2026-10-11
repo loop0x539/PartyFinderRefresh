@@ -41,4 +41,24 @@ public class RecruitmentPreset
         c.SlotFlags = (ulong[])SlotFlags.Clone();
         return c;
     }
+
+    /// <summary>Overwrite every recruitment setting with <paramref name="source"/>'s, keeping this preset's Id and Name.</summary>
+    public void CopySettingsFrom(RecruitmentPreset source)
+    {
+        Category = source.Category;
+        DutyId = source.DutyId;
+        Objective = source.Objective;
+        BeginnerFriendly = source.BeginnerFriendly;
+        CompletionStatus = source.CompletionStatus;
+        DutyFinderSettingFlags = source.DutyFinderSettingFlags;
+        LootRule = source.LootRule;
+        Password = source.Password;
+        LanguageFlags = source.LanguageFlags;
+        NumberOfSlotsInMainParty = source.NumberOfSlotsInMainParty;
+        LimitRecruitingToWorld = source.LimitRecruitingToWorld;
+        OnePlayerPerJob = source.OnePlayerPerJob;
+        NumberOfGroups = source.NumberOfGroups;
+        SlotFlags = (ulong[])source.SlotFlags.Clone();
+        Comment = source.Comment;
+    }
 }

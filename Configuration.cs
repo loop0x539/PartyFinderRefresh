@@ -17,7 +17,7 @@ public class Configuration : IPluginConfiguration
     /// <summary>Re-recruit this many minutes after deploy/renew (game listings hard-expire at 60).</summary>
     public int RenewIntervalMinutes { get; set; } = 55;
 
-    /// <summary>Keep re-recruiting automatically as long as a preset is active.</summary>
+    /// <summary>Master switch: watch the deployed listing (renew, bump, leaver fix, stop when full).</summary>
     public bool AutoRenewEnabled { get; set; } = true;
 
     /// <summary>Also bump the listing on a short interval to keep it near the top of the search list.</summary>
@@ -27,6 +27,9 @@ public class Configuration : IPluginConfiguration
 
     /// <summary>Skip refreshes while the PF detail/edit window is open, to avoid fighting the UI.</summary>
     public bool PauseWhileDetailOpen { get; set; } = true;
+
+    /// <summary>Stop keeping the listing alive once the party is full (nothing left to recruit).</summary>
+    public bool StopWhenFull { get; set; } = true;
 
     /// <summary>Re-apply the active listing when a party member leaves (reopens the slot + job mask).</summary>
     public bool FixOnMemberLeave { get; set; } = true;

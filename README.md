@@ -17,6 +17,11 @@ Built against the current API: **Dalamud v15 / API 15** (`Dalamud.NET.Sdk/15.0.0
   hard expiry (default every 55 min), so your PF stays up indefinitely without manual re-posting.
   Job‑slot requirements and the comment are re‑applied on each renew (a plain re-recruit would
   otherwise reset slots to your current party).
+- **Stops when full** – Once every slot is filled, the plugin stops keeping the listing alive (and
+  says so in chat), so a full party never gets re-listed. Can be turned off in settings if you'd rather
+  stay armed and re-post when someone leaves later.
+- **Leaver fix** – If someone leaves before the party fills, the listing is re-posted so their slot
+  reopens with the preset's job restrictions.
 - **Optional bump** – Re-recruit on a short interval to keep the listing near the top of the search
   list. Pauses while you have the Party Finder window open.
 
@@ -40,11 +45,17 @@ Output: `bin/Release/PartyFinderRefresh.dll` (dev-loadable) and `bin/Release/Par
 ## Usage
 
 - `/pfr` – open the main window.
-- `/pfr config` – open settings.
+- `/pfr config` – open settings (also the cog in the window's title bar).
+- `/pfr stop` – stop keeping the current listing alive.
 
-In the main window: type a name and **Capture** your current in‑game recruitment setup, then
-**Deploy** any saved preset. The status block shows whether you're recruiting and the countdown to
-the next refresh.
+1. In‑game, open the Party Finder, click **Recruit Members** and set up the listing.
+2. In the plugin window click **Save current setup** (the name defaults to the duty).
+3. Click **Deploy** on any preset. The top of the window shows whether you're recruiting, how full
+   the party is, and a countdown to the next renew, with **Renew now** and **Stop** buttons.
+
+Each preset shows its duty, a role chip per slot (hover for the allowed jobs) and its comment. Use
+the pen button to rename it, edit the comment, duplicate it, update it from your current in‑game
+setup, or delete it (hold Ctrl for update/delete).
 
 ## Maintenance note — game signatures
 
